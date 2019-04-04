@@ -49,6 +49,16 @@ contract Marketplace is Ownable {
     function getAdmins() public view onlyOwner returns(address[] memory) {
         return adminsArr;
     }
+
+     function isAdmin() public view onlyOwner returns (bool) {
+        for(uint i = 0; i < adminsArr.length; i++) {
+            if(adminsArr[i] == msg.sender) {
+                return true;
+            }
+        }
+
+        return false;
+    }
     
     function addStoreOwner(address storeOwnerAddr) public onlyAdmin {
         for(uint i = 0; i < storeOwners.length; i++){
