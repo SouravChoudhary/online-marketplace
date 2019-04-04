@@ -4,6 +4,7 @@ import 'node_modules/openzeppelin-solidity/contracts/ownership/Ownable.sol';
 import './StoreOwner.sol';
 
 contract Marketplace is Ownable {
+    address[] private adminsArr;
     mapping (address => bool) private admins;
     StoreOwner[] private storeOwners;
     
@@ -29,9 +30,24 @@ contract Marketplace is Ownable {
     function addAdmin(address adminAddr) public payable onlyOwner {
         if(admins[adminAddr] == false) {
             admins[adminAddr] = true;
+            adminsArr.push(adminAddr);
         } else {
             revert("This address is admin already!");
         }
+    }
+
+    function removeAdmin(address adminAddr) public payable onlyOwner {
+        for(uint i = 0; i < adminsArr.length; i++) {
+            if(adminsArr[i] == adminAddr) {
+                delete adminsArr[i];
+                admins[adminAddr] = false;
+                break;
+            }
+        }
+    }
+
+    function getAdmins() public view onlyOwner returns(address[] memory) {
+        return adminsArr;
     }
     
     function addStoreOwner(address storeOwnerAddr) public onlyAdmin {
