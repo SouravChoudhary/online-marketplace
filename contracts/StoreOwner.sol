@@ -14,6 +14,10 @@ contract StoreOwner {
     function getAddress() public view returns(address) {
         return addr;
     }
+
+    function getBalance() public view returns(uint) {
+        return balance;
+    }
     
     function addStoreFront(StoreFront storeFront) public payable {
         storeFronts.push(storeFront);
@@ -21,9 +25,5 @@ contract StoreOwner {
     
     function getStoreFronts() public view returns(StoreFront[] memory) {
         return storeFronts;
-    }
-    
-    function getBalance() public view returns(uint) {
-        return balance;
     }
 }
