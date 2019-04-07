@@ -7,6 +7,7 @@ contract StoreFront {
         string description;
         uint price;
     }
+    bool private haveProducts = false;
     Product[] private products;
 
     function setName(string memory _storeName) public payable {
@@ -18,11 +19,20 @@ contract StoreFront {
     }
     
     function addProduct(string memory title, string memory description, uint price) public payable {
+        haveProducts = true;
         products.push(Product(title, description, price));
     }
+
+    function removeProduct(uint index) public payable {
+        delete products[index];
+    }
     
-    function getProductsLength() public view returns(uint){
-        return products.length;
+    function getProductsLength() public view returns(uint) {
+        if(haveProducts) {
+            return products.length;
+        } else {
+            return 0;
+        }
     }
     
     function getProduct(uint productId) public view returns(string memory, string memory, uint){

@@ -39,15 +39,12 @@ function initContract() {
 
 function marketplace() {
     //only owner
-    isActive('#onlyOwner', false);
     onlyOwner();
 
     //only admin
-    isActive('#onlyAdmin', false);
     onlyAdmin();
 
     //onlt store owner
-    isActive('#onlyStoreOwner', false);
     onlyStoreOwner();
 }
 
@@ -58,10 +55,11 @@ function marketplace() {
 function onlyOwner() {
     marketplaceInstance.isOwner({'from': account()}, function(err, res) {
         if(!err && res === true){
-            $('#welcomeTitle').append('<h2>Welcome, owner!</h2>');
-            isActive('#onlyOwner', true);
-            getAdmins();
-            addAdmin();
+            setWelcomeTitle('owner');
+            $('#accountRole').load( "./pages/owner.html", function() {
+                getAdmins();
+                addAdmin();
+            });
         }
     });
 }
@@ -80,18 +78,6 @@ function addAdmin() {
     addItem(admin);
 }
 
-// function removeAdmin(index, address) {
-//     marketplaceInstance.removeAdmin(address, {'from': account()}, function(err, res){
-//         if(!err){
-//             $('#addAdminInput').val('');
-//             $('#listOfAdmins').find('button[data-index="'+index+'"]').parent().remove();
-//             alertMessage('Admin removed successfully!', 'success');    
-//         } else {
-//             alertMessage('Error!', 'danger');
-//         }
-//     });
-// }
-
 function getAdmins() {
     const admins = {
         'getItemsList': '#listOfAdmins',
@@ -108,10 +94,11 @@ function getAdmins() {
 function onlyAdmin() {
     marketplaceInstance.isAdmin({'from': account()}, function(err, res){
         if(!err && res === true){
-            $('#welcomeTitle').append('<h2>Welcome, admin!</h2>');
-            isActive('#onlyAdmin', true);
-            addStoreOwner();
-            getStoreOwners();
+            setWelcomeTitle('admin');
+            $('#accountRole').load( "./pages/admin.html", function(){
+                addStoreOwner();
+                getStoreOwners();
+            });
         }
     });
 }
@@ -146,11 +133,8 @@ function getStoreOwners() {
 function onlyStoreOwner() {
     marketplaceInstance.isStoreOwner({'from': account()}, function(err, res){
         if(!err && res === true){
-            $('#welcomeTitle').append('<h2>Welcome, store owner!</h2>');
-            isActive('#onlyStoreOwner', true);
-            addStoreFront();
-            getStoreFronts();
-            addProduct();
+            setWelcomeTitle('store owner');
+            loadStoreFronts();
         }
     });
 }
@@ -162,6 +146,7 @@ function addStoreFront() {
         if(storeName !== '') {
             marketplaceInstance.addStoreFront(storeName, {'from': account()}, function(err, res){
                 if(!err) {
+                    clearAlerts();
                     getStoreFront(storeName);
                     $('#addStoreFrontInput').val('');
                     alertMessage('Store front added successfully!', 'success');
@@ -177,7 +162,7 @@ function addStoreFront() {
 
 function getStoreFronts() {
     marketplaceInstance.getStoreFronts({'from': account()}, function(err, res){
-        if(!err) {
+        if(!err && res.length !== 0) {
             for(let i = 0; i < res.length; i++) {
                 marketplaceInstance.getStoreFrontName(i, {'from': account()}, function(err, res){
                     getStoreFront(res);
@@ -189,12 +174,49 @@ function getStoreFronts() {
     });
 }
 
-function addProduct() {
+function addProduct(index) {
+    $('#addProduct').on('click', function(){
+        let productName = $('#productName').val();
+        let productDescription = $('#productDescription').val();
+        let productPrice = $('#productPrice').val();
 
+        if(productName !== '' && productPrice !== '') {
+            marketplaceInstance.addProduct(index, productName, productDescription, productPrice, {'from': account()}, function(err, res){
+                clearAlerts();
+                alertMessage('Product added successfully!', 'success');
+            });
+        } else {
+            alertMessage('Name and price fields are required!', 'danger');
+        }
+    });
 }
 
-function getProduct() {
+function getProducts(index) {
+    marketplaceInstance.getProductsLength(index, {'from': account()}, function(err, res){
+        if(!err && res.toString() !== '0') {
+            for(let i = 0; i < Number(res); i++) {
+                marketplaceInstance.getProduct(index, i, {'from': account()}, function(error, result){
+                    if(result[0] !== '' && result[3] !== 0) {
+                        showProductsList(index, i, result);
+                    }
 
+                    if(i === 0 && $('#productsList').children().length === 0) {
+                        alertMessage('This store front doesn\'t have any products.', 'primary');
+                    }
+                });
+            }
+        } else {
+            alertMessage('This store front doesn\'t have any products.', 'primary');
+        }
+    });
+}
+
+function showProductsList(storeFrontIndex, productIndex, item) {
+    let title = item[0];
+    let description = item[1];
+    let price = item[2].toString();
+
+    $('#productsList').append('<div class="row mt-4 mb-4 border border-primary"><div class="col-2">Title:</div><div class="col-10"><h5 class="card-title mb-3 mt-3">'+title+'</h5></div><div class="col-2">Desctiption:</div><div class="col-10"><p class="card-text">'+description+'</p></div><div class="col-2">Price:</div><div class="col-10"><p>'+price+'</p></div><div class="col-12"><button type="button" class="btn btn-secondary mb-3 mt-3 float-left" onclick="editProduct('+storeFrontIndex+', '+productIndex+')">Edit</button><button type="button" class="btn btn-danger mb-3 mt-3 float-right" onclick="removeProduct('+storeFrontIndex+', '+productIndex+')">Delete</button></div></div>');
 }
 
 //#region
@@ -210,15 +232,7 @@ function getCurrentAddress() {
 }
 
 function alertMessage(msg, typeOfMessage) {
-    $('<div class="alert alert-'+typeOfMessage+'" role="alert">'+msg+'<button type="button" class="close" data-dismiss="alert" aria-label="Close"><span aria-hidden="true">&times;</span></button></div>').appendTo('body');
-}
-
-function isActive(id, show) {
-    if(show === true) {
-        $(id).removeAttr('hidden');
-    } else {
-        $(id).attr('hidden', 'hidden');
-    }
+    $('<div class="mt-2 alert alert-'+typeOfMessage+'" role="alert">'+msg+'<button type="button" class="close" data-dismiss="alert" aria-label="Close"><span aria-hidden="true">&times;</span></button></div>').prependTo('body');
 }
 
 function addItem(item) {
@@ -228,6 +242,7 @@ function addItem(item) {
         if($(item.addItemInput).val() !== ''){
             marketplaceInstance[item.addMethod](inputVal, {'from': account()}, function(err, res){
                 if(!err){
+                    clearAlerts();
                     if($(item.listOfItems).children().not('div').length === 0) {
                         $(item.listOfItems).empty();
                     }
@@ -241,6 +256,18 @@ function addItem(item) {
         } else {
             alertMessage(item.itemRequiredMsg, 'danger');
         }
+    });
+}
+
+function productsHelpers(name) {
+    $('#showProductForm').on('click', function(){
+        $('#productForm').toggle(0);
+    });
+
+    $('#storeFrontName').text(name);
+    $('#backBtn').on('click', function(){
+        clearAlerts();
+        loadStoreFronts();
     });
 }
 
@@ -258,7 +285,43 @@ function getItems(item) {
 }
 
 function getStoreFront(name) {
-    $('#listOfStoreFronts').append('<div class="col-2 ml-3 mr-3 card"><img src="./src/images/item.png" class="card-img-top" alt="..."><div class="card-body"><h5 class="card-title text-center mb-3 mt-3">'+name+'</h5><p class="card-text">Random text text  text  text  text  text  text  text  text  text  text  text  text  text </p><div class="text-center"><a href="#" class="btn btn-primary mb-3 mt-3">Products</a></div></div></div>');
+    let index = $('#listOfStoreFronts').children().length;
+
+    $('#listOfStoreFronts').append('<div class="col-2 ml-3 mr-3 card"><div class="card-body"><h5 class="card-title text-center mb-3 mt-3">'+name+'</h5><p class="card-text">Random text text  text  text  text  text  text  text  text  text  text  text  text  text </p><div class="text-center"><button type="button" class="btn btn-secondary mb-3 mt-3" onclick="manageStoreFront('+index+', \''+name+'\')">Manage</button></div></div></div>');
+}
+
+function manageStoreFront(index, name) {
+    clearAlerts();
+    $('#accountRole').load( "./pages/products.html", function() {
+        addProduct(index);
+        getProducts(index);
+        productsHelpers(name)
+    });
+}
+
+function loadStoreFronts() {
+    $('#accountRole').load( "./pages/store-fronts.html", function(){
+        addStoreFront();
+        getStoreFronts();
+    });
+}
+
+function removeProduct(storeFrontIndex, productIndex){
+    marketplaceInstance.removeProduct(storeFrontIndex, productIndex, {'from': account()}, function(err, res){
+        if(!err) {
+            alertMessage('Product removed successfully', 'success');
+        } else {
+            alertMessage('Error! Product was not removed!', 'danger');
+        }
+    });
+}
+
+function setWelcomeTitle(role) {
+    $('#welcomeTitle').append('<h2>Welcome, '+role+'!</h2>');
+}
+
+function clearAlerts() {
+    $('[role="alert"]').remove();
 }
 
 //#endregion

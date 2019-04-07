@@ -30,15 +30,6 @@ contract Marketplace is Ownable {
         }
     }
 
-    // function removeAdmin(address adminAddr) public payable onlyOwner {
-    //     for(uint i = 0; i < adminsArr.length; i++) {
-    //         if(adminsArr[i] == adminAddr) {
-    //             admins[adminAddr] = false;
-    //             break;
-    //         }
-    //     }
-    // }
-
     function getAdmins() public view onlyOwner returns(address[] memory) {
         return adminsArr;
     }
@@ -75,16 +66,12 @@ contract Marketplace is Ownable {
     }
 
     function getStoreFrontName(uint index) public view onlyStoreOwner returns (string memory) {
-        if(storeOwners[msg.sender].getAddress() == msg.sender) {
-            return storeOwners[msg.sender].getStoreFronts()[index].getName();
-        }
+        return storeOwners[msg.sender].getStoreFronts()[index].getName();
     }
     
-    // function getStoreFronts() public view onlyStoreOwner returns(StoreFront[] memory) {
-    //     if(storeOwners[msg.sender].getAddress() == msg.sender) {
-    //         return storeOwners[msg.sender].getStoreFronts();
-    //     }
-    // }
+    function getStoreFronts() public view onlyStoreOwner returns(StoreFront[] memory) {
+        return storeOwners[msg.sender].getStoreFronts();
+    }
     
     function addProduct(
         uint storeFrontId,
@@ -100,30 +87,51 @@ contract Marketplace is Ownable {
         
         validate(storeFronts.length, storeFrontId, "Store front doesn't exist for this shop owner!");
                 
-        for(uint i = 0; i < storeFronts.length; i++) {
-            if(i == storeFrontId) {
-                storeFronts[i].addProduct(title, description, price);
-            }
-        }
+        return storeOwners[msg.sender].getStoreFront(storeFrontId).addProduct(title, description, price);
     }
-    
-    function getProduct(uint storeFrontId, uint productId) public view onlyStoreOwner returns (string memory, string memory, uint) {
+
+    function removeProduct(uint storeFrontId, uint productId) public payable onlyStoreOwner {
         StoreFront[] memory storeFronts;
         storeFronts = getStoreFronts();
         
         validate(storeFronts.length, storeFrontId, "Store front doesn't exist for this shop owner!");
+
+        storeOwners[msg.sender].getStoreFront(storeFrontId).removeProduct(productId);
+    }
+    
+    // function getProduct(uint storeFrontId, uint productId) public view onlyStoreOwner returns (string memory, string memory, uint) {
+    //     StoreFront[] memory storeFronts;
+    //     storeFronts = getStoreFronts();
         
-        for(uint i = 0; i < storeFronts.length; i++) {
-            validate(storeFronts[i].getProductsLength(), productId, "Product doesn't exist for this shop owner's store front!");
+    //     validate(storeFronts.length, storeFrontId, "Store front doesn't exist for this shop owner!");
+        
+    //     for(uint i = 0; i < storeFronts.length; i++) {
+    //         validate(storeFronts[i].getProductsLength(), productId, "Product doesn't exist for this shop owner's store front!");
             
-            if(i == storeFrontId) {
-                return storeFronts[i].getProduct(productId);    
-            }
-        }
+    //         if(i == storeFrontId) {
+    //             return storeFronts[i].getProduct(productId);    
+    //         }
+    //     }
+    // }
+
+    function getProductsLength(uint storeFrontIndex) public view returns(uint) {
+        StoreFront[] memory storeFronts;
+        storeFronts = getStoreFronts();
+        return storeFronts[storeFrontIndex].getProductsLength();
+    }
+
+    function getProduct(uint storeFrontIndex, uint productIndex) public view onlyStoreOwner returns(string memory, string memory, uint) {
+        StoreFront[] memory storeFronts;
+        storeFronts = getStoreFronts();
+        
+        validate(storeFronts.length, storeFrontIndex, "Store front doesn't exist for this shop owner!");
+        validate(storeFronts[storeFrontIndex].getProductsLength(), productIndex, "Product doesn't exist for this shop owner's store front!");
+
+        return storeOwners[msg.sender].getStoreFronts()[storeFrontIndex].getProduct(productIndex);
     }
     
     function validate(uint itemsLength, uint index, string memory message) private view onlyStoreOwner {
-        if(itemsLength - 1 < index || index < 0 || itemsLength == 0) {
+        if(itemsLength - 1 < index || itemsLength == 0) {
             revert(message);    
         }   
     }

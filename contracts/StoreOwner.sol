@@ -22,6 +22,10 @@ contract StoreOwner {
     function addStoreFront(StoreFront storeFront) public payable {
         storeFronts.push(storeFront);
     }
+
+    function getStoreFront(uint index) public view returns(StoreFront) {
+        return storeFronts[index];
+    }
     
     function getStoreFronts() public view returns(StoreFront[] memory) {
         return storeFronts;
