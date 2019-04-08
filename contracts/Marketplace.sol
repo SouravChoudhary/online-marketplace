@@ -1,138 +1,128 @@
 pragma solidity ^0.5.2;
 
-import 'node_modules/openzeppelin-solidity/contracts/ownership/Ownable.sol';
-import './StoreOwner.sol';
+import './Ownable.sol';
+import './StoreFront.sol';
 
 contract Marketplace is Ownable {
-    address[] private adminsArr;
     mapping (address => bool) private admins;
-
-    address[] private storeOwnersAddr;
-    mapping (address => bool) private storeOwnersActive;
-    mapping (address => StoreOwner) private storeOwners;
     
     modifier onlyAdmin() {
         require(isAdmin());
         _;
     }
+
+    function isAdmin() public view returns(bool) {
+        return admins[msg.sender] == true;
+    }
+
+    function addAdmin(address adminAddr) public payable onlyOwner {
+        if(admins[adminAddr] == true) {
+            revert("This address is admin already!");
+        }
+        
+        admins[adminAddr] = true;
+    }
+
+    struct Store {
+        bool active;
+        StoreFront addr;
+        string name;
+        uint256 count;
+        mapping (uint256 => Product) products;
+    }
     
+    struct Product {
+        bool active;
+        uint256 price;
+    }
+
+    struct StoreOwner {
+        bool active;
+        uint256 balance;
+        uint256 count;
+        mapping (uint256 => Store) storeFronts;
+    }
+
+    mapping (address => StoreOwner) private storeOwners;
+    
+    function addStoreOwner(address addr) public payable onlyAdmin {
+        if(storeOwners[addr].active) {
+            revert("This address is store owner already!");
+        }
+        
+        storeOwners[addr].active = true;
+    }
+
     modifier onlyStoreOwner() {
         require(isStoreOwner());
         _;
     }
-    
-    function addAdmin(address adminAddr) public payable onlyOwner {
-        if(admins[adminAddr] == false) {
-            admins[adminAddr] = true;
-            adminsArr.push(adminAddr);
-        } else {
-            revert("This address is admin already!");
-        }
-    }
-
-    function getAdmins() public view onlyOwner returns(address[] memory) {
-        return adminsArr;
-    }
-
-    function isAdmin() public view returns (bool) {
-        return admins[msg.sender] == true;
-    }
-    
-    function addStoreOwner(address storeOwnerAddr) public onlyAdmin {
-        if(storeOwnersActive[storeOwnerAddr] == true){
-            revert("This address is store owner already!");
-        }    
-
-        storeOwnersActive[storeOwnerAddr] = true;
-        storeOwnersAddr.push(storeOwnerAddr);
-        storeOwners[storeOwnerAddr] = new StoreOwner();
-        storeOwners[storeOwnerAddr].setAddress(storeOwnerAddr);
-    }
-    
-    function getStoreOwners() public view onlyAdmin returns(address[] memory) {
-        return storeOwnersAddr;
-    }
 
     function isStoreOwner() public view returns(bool) {
-        return storeOwnersActive[msg.sender] == true;
+        return storeOwners[msg.sender].active == true;
     }
     
-    function addStoreFront(string memory storeName) public payable onlyStoreOwner {
-        if(storeOwnersActive[msg.sender] == true) {
-            StoreFront storeFront = new StoreFront();
-            storeFront.setName(storeName);
-            storeOwners[msg.sender].addStoreFront(storeFront);
-        }
+    function addStoreFront(string memory name) public payable onlyStoreOwner {
+        uint256 index = storeOwners[msg.sender].count++;
+
+        StoreFront addr = new StoreFront();
+
+        Store memory storeFront;
+        storeFront.active = true;
+        storeFront.name = name;
+        storeFront.addr = addr;
+
+        storeOwners[msg.sender].storeFronts[index] = storeFront;
     }
 
-    function getStoreFrontName(uint index) public view onlyStoreOwner returns (string memory) {
-        return storeOwners[msg.sender].getStoreFronts()[index].getName();
+    modifier storeFrontActive(uint256 key) {
+        require(storeOwners[msg.sender].storeFronts[key].active == true);
+        _;
+    }
+
+    function getStoreFrontsCount() public view onlyStoreOwner returns (uint256) {
+        return storeOwners[msg.sender].count;
+    }
+
+    function getStoreFront(uint256 key) public view onlyStoreOwner storeFrontActive(key) returns (string memory) {
+        return storeOwners[msg.sender].storeFronts[key].name;
     }
     
-    function getStoreFronts() public view onlyStoreOwner returns(StoreFront[] memory) {
-        return storeOwners[msg.sender].getStoreFronts();
-    }
-    
-    function addProduct(
-        uint storeFrontId,
-        string memory title, 
-        string memory description, 
-        uint price
-    ) public payable onlyStoreOwner {
-        require(abi.encodePacked(title).length > 0, "Product title is required!");
+    function addProduct(uint256 key, uint256 price) public payable onlyStoreOwner storeFrontActive(key) {
         require(price > 0, "Price is required!");
-        
-        StoreFront[] memory storeFronts;
-        storeFronts = getStoreFronts();
-        
-        validate(storeFronts.length, storeFrontId, "Store front doesn't exist for this shop owner!");
-                
-        return storeOwners[msg.sender].getStoreFront(storeFrontId).addProduct(title, description, price);
+
+        uint256 index = storeOwners[msg.sender].storeFronts[key].count++;
+
+        storeOwners[msg.sender].storeFronts[key].products[index] = Product(true, price);
     }
 
-    function removeProduct(uint storeFrontId, uint productId) public payable onlyStoreOwner {
-        StoreFront[] memory storeFronts;
-        storeFronts = getStoreFronts();
-        
-        validate(storeFronts.length, storeFrontId, "Store front doesn't exist for this shop owner!");
-
-        storeOwners[msg.sender].getStoreFront(storeFrontId).removeProduct(productId);
-    }
-    
-    // function getProduct(uint storeFrontId, uint productId) public view onlyStoreOwner returns (string memory, string memory, uint) {
-    //     StoreFront[] memory storeFronts;
-    //     storeFronts = getStoreFronts();
-        
-    //     validate(storeFronts.length, storeFrontId, "Store front doesn't exist for this shop owner!");
-        
-    //     for(uint i = 0; i < storeFronts.length; i++) {
-    //         validate(storeFronts[i].getProductsLength(), productId, "Product doesn't exist for this shop owner's store front!");
-            
-    //         if(i == storeFrontId) {
-    //             return storeFronts[i].getProduct(productId);    
-    //         }
-    //     }
-    // }
-
-    function getProductsLength(uint storeFrontIndex) public view returns(uint) {
-        StoreFront[] memory storeFronts;
-        storeFronts = getStoreFronts();
-        return storeFronts[storeFrontIndex].getProductsLength();
+    function editProduct(
+        uint256 storeKey, 
+        uint256 productKey, 
+        uint price) public payable 
+        onlyStoreOwner 
+        storeFrontActive(storeKey) {
+        storeOwners[msg.sender].storeFronts[storeKey].products[productKey].price = price;
     }
 
-    function getProduct(uint storeFrontIndex, uint productIndex) public view onlyStoreOwner returns(string memory, string memory, uint) {
-        StoreFront[] memory storeFronts;
-        storeFronts = getStoreFronts();
-        
-        validate(storeFronts.length, storeFrontIndex, "Store front doesn't exist for this shop owner!");
-        validate(storeFronts[storeFrontIndex].getProductsLength(), productIndex, "Product doesn't exist for this shop owner's store front!");
-
-        return storeOwners[msg.sender].getStoreFronts()[storeFrontIndex].getProduct(productIndex);
+    function getProduct(
+        uint256 storeKey, 
+        uint256 productKey) public view 
+        onlyStoreOwner 
+        storeFrontActive(storeKey) returns(uint256) {
+        return storeOwners[msg.sender].storeFronts[storeKey].products[productKey].price;
     }
-    
-    function validate(uint itemsLength, uint index, string memory message) private view onlyStoreOwner {
-        if(itemsLength - 1 < index || itemsLength == 0) {
-            revert(message);    
-        }   
+
+    function getProductsCount(uint256 storeKey) public view onlyStoreOwner storeFrontActive(storeKey) returns(uint256) {
+        return storeOwners[msg.sender].storeFronts[storeKey].count;
+    }
+
+    function removeProduct(
+        uint256 storeKey, 
+        uint256 productKey) public payable 
+        onlyStoreOwner 
+        storeFrontActive(storeKey) {
+        delete(storeOwners[msg.sender].storeFronts[storeKey].products[productKey]);
+        storeOwners[msg.sender].storeFronts[storeKey].count--;
     }
 }

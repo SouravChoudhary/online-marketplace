@@ -57,7 +57,7 @@ function onlyOwner() {
         if(!err && res === true){
             setWelcomeTitle('owner');
             $('#accountRole').load( "./pages/owner.html", function() {
-                getAdmins();
+                // getAdmins();
                 addAdmin();
             });
         }
@@ -78,14 +78,14 @@ function addAdmin() {
     addItem(admin);
 }
 
-function getAdmins() {
-    const admins = {
-        'getItemsList': '#listOfAdmins',
-        'getMethod': 'getAdmins'
-    };
+// function getAdmins() {
+//     const admins = {
+//         'getItemsList': '#listOfAdmins',
+//         'getMethod': 'getAdmins'
+//     };
 
-    getItems(admins);
-}
+//     getItems(admins);
+// }
 
 //#endregion
 
@@ -97,7 +97,7 @@ function onlyAdmin() {
             setWelcomeTitle('admin');
             $('#accountRole').load( "./pages/admin.html", function(){
                 addStoreOwner();
-                getStoreOwners();
+                // getStoreOwners();
             });
         }
     });
@@ -117,14 +117,14 @@ function addStoreOwner() {
     addItem(storeOwner);
 }
 
-function getStoreOwners() {
-    const storeOwners = {
-        'getItemsList': '#listOfStoreOwners',
-        'getMethod': 'getStoreOwners'
-    };
+// function getStoreOwners() {
+//     const storeOwners = {
+//         'getItemsList': '#listOfStoreOwners',
+//         'getMethod': 'getStoreOwners'
+//     };
 
-    getItems(storeOwners);
-}
+//     getItems(storeOwners);
+// }
 
 //#endregion
 
@@ -161,10 +161,10 @@ function addStoreFront() {
 }
 
 function getStoreFronts() {
-    marketplaceInstance.getStoreFronts({'from': account()}, function(err, res){
-        if(!err && res.length !== 0) {
-            for(let i = 0; i < res.length; i++) {
-                marketplaceInstance.getStoreFrontName(i, {'from': account()}, function(err, res){
+    marketplaceInstance.getStoreFrontsCount({'from': account()}, function(err, res){
+        if(!err && Number(res.toString()) !== 0) {
+            for(let i = 0; i < Number(res.toString()); i++) {
+                marketplaceInstance.getStoreFront(i, {'from': account()}, function(err, res){
                     getStoreFront(res);
                 });
             }
@@ -192,22 +192,56 @@ function addProduct(index) {
 }
 
 function getProducts(index) {
-    marketplaceInstance.getProductsLength(index, {'from': account()}, function(err, res){
-        if(!err && res.toString() !== '0') {
+    marketplaceInstance.getProductsCount(index, {'from': account()}, function(err, res){
+        if(!err && Number(res.toString()) !== 0) {
             for(let i = 0; i < Number(res); i++) {
                 marketplaceInstance.getProduct(index, i, {'from': account()}, function(error, result){
                     if(result[0] !== '' && result[3] !== 0) {
                         showProductsList(index, i, result);
                     }
-
-                    if(i === 0 && $('#productsList').children().length === 0) {
-                        alertMessage('This store front doesn\'t have any products.', 'primary');
-                    }
                 });
             }
-        } else {
-            alertMessage('This store front doesn\'t have any products.', 'primary');
         }
+    });
+}
+
+function editProduct(el) {
+    let storeFrontIndex = $(el).attr('data-store-front-index');
+    let productIndex = $(el).attr('data-product-index');
+
+    $('#updateTitle').removeAttr('disabled');
+    $('#updateDescription').removeAttr('disabled');
+    $('#updatePrice').removeAttr('disabled');
+
+    $(el).text('Close').removeAttr('onclick');
+
+    $(el).one('click', function(){
+        $('#updateTitle').attr('disabled', 'disabled');
+        $('#updateDescription').attr('disabled', 'disabled');
+        $('#updatePrice').attr('disabled', 'disabled');
+        $(el).attr('onclick', 'editProduct(this)').text('Edit');
+        $(el).siblings('[data-update="true"]').attr('hidden', 'hidden');
+    });
+
+    $(el).siblings('[data-update="true"]').removeAttr('hidden');
+
+    let title = $(el).parents(0).siblings('[data-product="title"]');
+    let description = $(el).parents(0).siblings('[data-product="description"]');
+    let price = $(el).parents(0).siblings('[data-product="price"]');
+
+    let titleText = title.children().first().text();
+    let descriptionText = description.children().first().text();
+    let priceText = price.children().first().text();
+
+
+    $(el).siblings('[data-update="true"]').on('click', function(){
+        marketplaceInstance.editProduct(storeFrontIndex, productIndex, titleText, descriptionText, priceText, {'from': account()}, function(err, res){
+            if(!err ) {
+                alertMessage('Product edited successfully!','success');
+            } else {
+                alertMessage('Product edition failed!','danger')
+            }
+        });
     });
 }
 
@@ -216,7 +250,11 @@ function showProductsList(storeFrontIndex, productIndex, item) {
     let description = item[1];
     let price = item[2].toString();
 
-    $('#productsList').append('<div class="row mt-4 mb-4 border border-primary"><div class="col-2">Title:</div><div class="col-10"><h5 class="card-title mb-3 mt-3">'+title+'</h5></div><div class="col-2">Desctiption:</div><div class="col-10"><p class="card-text">'+description+'</p></div><div class="col-2">Price:</div><div class="col-10"><p>'+price+'</p></div><div class="col-12"><button type="button" class="btn btn-secondary mb-3 mt-3 float-left" onclick="editProduct('+storeFrontIndex+', '+productIndex+')">Edit</button><button type="button" class="btn btn-danger mb-3 mt-3 float-right" onclick="removeProduct('+storeFrontIndex+', '+productIndex+')">Delete</button></div></div>');
+    $('#productsList').append('<div class="row mt-4 mb-4 border border-secondary"><div class="col-2 my-auto">Title:</div><div data-product="title" class="col-10"><input class="form-control mb-3 mt-3" id="updateTitle" type="text" placeholder="Enter product title" name="updateTitle" disabled></div><div class="col-2 my-auto">Desctiption:</div><div data-product="description" class="col-10"><input class="form-control mb-3 mt-3" id="updateDescription" type="text" placeholder="Enter product description" name="updateDescription" disabled></div><div class="col-2 my-auto">Price:</div><div class="col-10" data-product="price"><input class="form-control mb-3 mt-3" id="updatePrice" type="text" placeholder="Enter product price" name="updatePrice" disabled></div><div class="col-12"><button type="button" class="btn btn-secondary mb-3 mt-3 float-left" data-edit="true" data-store-front-index="'+storeFrontIndex+'" data-product-index="'+productIndex+'" onclick="editProduct(this)">Edit</button><button data-update="true" type="button" class="btn btn-primary ml-3 mb-3 mt-3 float-left" hidden>Update</button><button type="button" class="btn btn-danger mb-3 mt-3 float-right" data-store-front-index="'+storeFrontIndex+'" data-product-index="'+productIndex+'" onclick="removeProduct(this)">Delete</button></div></div>');
+
+    $('#updateTitle').text(title).val(title);
+    $('#updateDescription').text(description).val(description);
+    $('#updatePrice').text(price).val(price);
 }
 
 //#region
@@ -271,18 +309,18 @@ function productsHelpers(name) {
     });
 }
 
-function getItems(item) {
-    marketplaceInstance[item.getMethod]({'from': account()}, function(err, res){
-        if(!err && res.length > 0){
-            $(item.getItemsList).empty();
-            for(let i = 0; i < res.length; i++) {
-                $(item.getItemsList).append('<li><div class="float-left">'+res[i]+'</div></li>');
-            }
-        } else {
-            alertMessage('The list is empty.', 'primary');
-        }
-    });
-}
+// function getItems(item) {
+//     marketplaceInstance[item.getMethod]({'from': account()}, function(err, res){
+//         if(!err && res.length > 0){
+//             $(item.getItemsList).empty();
+//             for(let i = 0; i < res.length; i++) {
+//                 $(item.getItemsList).append('<li><div class="float-left">'+res[i]+'</div></li>');
+//             }
+//         } else {
+//             alertMessage('The list is empty.', 'primary');
+//         }
+//     });
+// }
 
 function getStoreFront(name) {
     let index = $('#listOfStoreFronts').children().length;
@@ -306,7 +344,10 @@ function loadStoreFronts() {
     });
 }
 
-function removeProduct(storeFrontIndex, productIndex){
+function removeProduct(el){
+    let storeFrontIndex = $(el).attr('data-store-front-index');
+    let productIndex = $(el).attr('data-product-index');
+
     marketplaceInstance.removeProduct(storeFrontIndex, productIndex, {'from': account()}, function(err, res){
         if(!err) {
             alertMessage('Product removed successfully', 'success');
