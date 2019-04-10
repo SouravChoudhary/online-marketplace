@@ -1,0 +1,23 @@
+<div id="onlyStoreOwner" class="col-10 offset-1">
+    <h4 class="text-center">Store Front:</h4>
+    <h4 id="storeFrontName" class="text-center"></h4>
+    <div id="manageStoreFronts" class="row pt-3">
+        <div class="col-12">
+            <button id="showProductForm" type="button" class="btn btn-secondary">New Product</button>
+        </div>
+        <div class="col-12">
+            <form id="productForm" style="display: none" class="text-light m-3 p-3 bg-light">
+                <div class="form-group">
+                    <label for="productPrice">Price</label>
+                    <input  class="form-control mb-3" id="productPrice" type="text" placeholder="Enter product price" name="productPrice">
+                    <button id="addProduct" type="button" class="btn btn-primary">Add Product</button>
+                </div>
+            </form>
+        </div>
+        <div class="col-12" id="productsList"></div>
+        <div class="col-12">
+            <div id="storeFrontProducts" class="row"></div>
+        </div>
+    </div>
+</div>
+<button type="button" id="backBtn" class="btn btn-info fixed-top rounded-circle" style="top: 80px; left: 50px; height: 85px; width: 85px;"><- Back</button>
