@@ -148,8 +148,8 @@ function addStoreFront() {
                 if(!err) {
                     clearAlerts();
                     getStoreFront(storeName);
-                    $('#addStoreFrontInput').val('');
                     alertMessage('Store front added successfully!', 'success');
+                    window.location.reload();
                 } else {
                     alertMessage('Store front was not added!', 'danger');
                 }
@@ -161,11 +161,11 @@ function addStoreFront() {
 }
 
 function getStoreFronts() {
-    marketplaceInstance.getStoreFrontsCount({'from': account()}, function(err, res){
-        if(!err && Number(res.toString()) !== 0) {
-            for(let i = 0; i < Number(res.toString()); i++) {
-                marketplaceInstance.getStoreFront(i, {'from': account()}, function(err, res){
-                    getStoreFront(res);
+    marketplaceInstance.getStoreFrontsList({'from': account()}, function(err, res){
+        if(!err && res.length !== 0) {
+            for(let i = 0; i < res.length; i++) {
+                marketplaceInstance.getStoreFront(res[i], {'from': account()}, function(error, result){
+                    getStoreFront(res[i], result);
                 });
             }
         } else {
@@ -176,14 +176,18 @@ function getStoreFronts() {
 
 function addProduct(index) {
     $('#addProduct').on('click', function(){
-        let productName = $('#productName').val();
-        let productDescription = $('#productDescription').val();
         let productPrice = $('#productPrice').val();
 
-        if(productName !== '' && productPrice !== '') {
-            marketplaceInstance.addProduct(index, productName, productDescription, productPrice, {'from': account()}, function(err, res){
-                clearAlerts();
-                alertMessage('Product added successfully!', 'success');
+        if(productPrice !== '') {
+            marketplaceInstance.addProduct(index, productPrice, {'from': account()}, function(err, res){
+                if(!err) {
+                    clearAlerts();
+                    alertMessage('Product added successfully!', 'success');
+                    window.location.reload();
+                } else {
+                    alertMessage(err.message, 'danger');        
+                }
+                //window.location.reload();
             });
         } else {
             alertMessage('Name and price fields are required!', 'danger');
@@ -191,13 +195,16 @@ function addProduct(index) {
     });
 }
 
-function getProducts(index) {
-    marketplaceInstance.getProductsCount(index, {'from': account()}, function(err, res){
-        if(!err && Number(res.toString()) !== 0) {
-            for(let i = 0; i < Number(res); i++) {
-                marketplaceInstance.getProduct(index, i, {'from': account()}, function(error, result){
-                    if(result[0] !== '' && result[3] !== 0) {
-                        showProductsList(index, i, result);
+function getProducts(storeIndex) {
+    marketplaceInstance.getProductsList(storeIndex, {'from': account()}, function(err, res){
+        if(!err && res.length !== 0) {
+            for(let i = 0; i < res.length; i++) {
+                marketplaceInstance.getProduct(storeIndex, res[i], {'from': account()}, function(error, result){
+                    if(result !== null) {
+                        let price = Number(result.toString());
+                        if(price !== 0) {
+                            showProductsList(storeIndex, res[i], price);
+                        }
                     }
                 });
             }
@@ -206,38 +213,29 @@ function getProducts(index) {
 }
 
 function editProduct(el) {
-    let storeFrontIndex = $(el).attr('data-store-front-index');
+    let storeIndex = $(el).attr('data-store-front-index');
     let productIndex = $(el).attr('data-product-index');
-
-    $('#updateTitle').removeAttr('disabled');
-    $('#updateDescription').removeAttr('disabled');
-    $('#updatePrice').removeAttr('disabled');
+    let itemId = '[data-id="updatePrice'+storeIndex+''+productIndex+'"]';
+    
+    $(itemId).removeAttr('disabled');
 
     $(el).text('Close').removeAttr('onclick');
 
     $(el).one('click', function(){
-        $('#updateTitle').attr('disabled', 'disabled');
-        $('#updateDescription').attr('disabled', 'disabled');
-        $('#updatePrice').attr('disabled', 'disabled');
+        $(itemId).attr('disabled', 'disabled');
         $(el).attr('onclick', 'editProduct(this)').text('Edit');
         $(el).siblings('[data-update="true"]').attr('hidden', 'hidden');
     });
 
     $(el).siblings('[data-update="true"]').removeAttr('hidden');
 
-    let title = $(el).parents(0).siblings('[data-product="title"]');
-    let description = $(el).parents(0).siblings('[data-product="description"]');
-    let price = $(el).parents(0).siblings('[data-product="price"]');
-
-    let titleText = title.children().first().text();
-    let descriptionText = description.children().first().text();
-    let priceText = price.children().first().text();
-
-
     $(el).siblings('[data-update="true"]').on('click', function(){
-        marketplaceInstance.editProduct(storeFrontIndex, productIndex, titleText, descriptionText, priceText, {'from': account()}, function(err, res){
+        let price = Number($(el).parents(0).siblings('[data-product="price"]').children().first().val());
+
+        marketplaceInstance.editProduct(storeIndex, productIndex, price, {'from': account()}, function(err, res){
             if(!err ) {
                 alertMessage('Product edited successfully!','success');
+                window.location.reload();
             } else {
                 alertMessage('Product edition failed!','danger')
             }
@@ -245,16 +243,10 @@ function editProduct(el) {
     });
 }
 
-function showProductsList(storeFrontIndex, productIndex, item) {
-    let title = item[0];
-    let description = item[1];
-    let price = item[2].toString();
+function showProductsList(storeIndex, productIndex, price) {
+    $('#productsList').append('<div class="row mt-4 mb-4 border border-secondary"><div class="col-2 my-auto">Price:</div><div class="col-10" data-product="price"><input class="form-control mb-3 mt-3" data-id="updatePrice'+storeIndex+''+productIndex+'" type="text" placeholder="Enter product price" name="updatePrice" disabled></div><div class="col-12"><button type="button" class="btn btn-secondary mb-3 mt-3 float-left" data-edit="true" data-store-front-index="'+storeIndex+'" data-product-index="'+productIndex+'" onclick="editProduct(this)">Edit</button><button data-update="true" type="button" class="btn btn-primary ml-3 mb-3 mt-3 float-left" hidden>Update</button><button type="button" class="btn btn-danger mb-3 mt-3 float-right" data-store-front-index="'+storeIndex+'" data-product-index="'+productIndex+'" onclick="removeProduct(this)">Delete</button></div></div>');
 
-    $('#productsList').append('<div class="row mt-4 mb-4 border border-secondary"><div class="col-2 my-auto">Title:</div><div data-product="title" class="col-10"><input class="form-control mb-3 mt-3" id="updateTitle" type="text" placeholder="Enter product title" name="updateTitle" disabled></div><div class="col-2 my-auto">Desctiption:</div><div data-product="description" class="col-10"><input class="form-control mb-3 mt-3" id="updateDescription" type="text" placeholder="Enter product description" name="updateDescription" disabled></div><div class="col-2 my-auto">Price:</div><div class="col-10" data-product="price"><input class="form-control mb-3 mt-3" id="updatePrice" type="text" placeholder="Enter product price" name="updatePrice" disabled></div><div class="col-12"><button type="button" class="btn btn-secondary mb-3 mt-3 float-left" data-edit="true" data-store-front-index="'+storeFrontIndex+'" data-product-index="'+productIndex+'" onclick="editProduct(this)">Edit</button><button data-update="true" type="button" class="btn btn-primary ml-3 mb-3 mt-3 float-left" hidden>Update</button><button type="button" class="btn btn-danger mb-3 mt-3 float-right" data-store-front-index="'+storeFrontIndex+'" data-product-index="'+productIndex+'" onclick="removeProduct(this)">Delete</button></div></div>');
-
-    $('#updateTitle').text(title).val(title);
-    $('#updateDescription').text(description).val(description);
-    $('#updatePrice').text(price).val(price);
+    $('[data-id="updatePrice'+storeIndex+''+productIndex+'"]').text(price).val(price);
 }
 
 //#region
@@ -309,26 +301,23 @@ function productsHelpers(name) {
     });
 }
 
-// function getItems(item) {
-//     marketplaceInstance[item.getMethod]({'from': account()}, function(err, res){
-//         if(!err && res.length > 0){
-//             $(item.getItemsList).empty();
-//             for(let i = 0; i < res.length; i++) {
-//                 $(item.getItemsList).append('<li><div class="float-left">'+res[i]+'</div></li>');
-//             }
-//         } else {
-//             alertMessage('The list is empty.', 'primary');
-//         }
-//     });
-// }
+function getStoreFront(index, data) {
+    let address = 0;
+    let name = '';
+    if(typeof data === 'string') {
+        name = data;
+    } else {
+        address = data[0];
+        name = data[1];
+    }
 
-function getStoreFront(name) {
-    let index = $('#listOfStoreFronts').children().length;
-
-    $('#listOfStoreFronts').append('<div class="col-2 ml-3 mr-3 card"><div class="card-body"><h5 class="card-title text-center mb-3 mt-3">'+name+'</h5><p class="card-text">Random text text  text  text  text  text  text  text  text  text  text  text  text  text </p><div class="text-center"><button type="button" class="btn btn-secondary mb-3 mt-3" onclick="manageStoreFront('+index+', \''+name+'\')">Manage</button></div></div></div>');
+    $('#listOfStoreFronts').append('<div class="col-2 ml-3 mr-3 card"><div class="card-body"><h5 class="card-title text-center mb-3 mt-3">'+name+'</h5><p class="card-text"></p><div class="text-center"><button type="button" class="btn btn-secondary mb-3 mt-3" data-address="'+address+'" data-index="'+index+'" data-name="'+name+'" onclick="manageStoreFront(this)">Manage</button></div></div></div>');
 }
 
-function manageStoreFront(index, name) {
+function manageStoreFront(el) {
+    let index = $(el).attr('data-index');
+    let name = $(el).attr('data-name');
+
     clearAlerts();
     $('#accountRole').load( "./pages/products.html", function() {
         addProduct(index);
@@ -351,6 +340,7 @@ function removeProduct(el){
     marketplaceInstance.removeProduct(storeFrontIndex, productIndex, {'from': account()}, function(err, res){
         if(!err) {
             alertMessage('Product removed successfully', 'success');
+            window.location.reload();
         } else {
             alertMessage('Error! Product was not removed!', 'danger');
         }

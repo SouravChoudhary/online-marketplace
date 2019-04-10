@@ -7,122 +7,157 @@ contract Marketplace is Ownable {
     mapping (address => bool) private admins;
     
     modifier onlyAdmin() {
-        require(isAdmin());
+        require(isAdmin(), "You are not admin.");
         _;
     }
-
+    
     function isAdmin() public view returns(bool) {
         return admins[msg.sender] == true;
     }
-
+    
     function addAdmin(address adminAddr) public payable onlyOwner {
         if(admins[adminAddr] == true) {
             revert("This address is admin already!");
         }
-        
+    
         admins[adminAddr] = true;
     }
-
+    
     struct Store {
         bool active;
         StoreFront addr;
         string name;
-        uint256 count;
-        mapping (uint256 => Product) products;
+        bytes32[] keys;
+        mapping (bytes32 => Product) products;
     }
     
     struct Product {
         bool active;
         uint256 price;
     }
-
+    
     struct StoreOwner {
         bool active;
         uint256 balance;
-        uint256 count;
-        mapping (uint256 => Store) storeFronts;
+        bytes32[] keys;
     }
-
+     
+    bytes32[] private storeFrontsKeys;
+    mapping (bytes32 => Store) private storeFronts;
+     
+    address[] private allStoreOwners;
     mapping (address => StoreOwner) private storeOwners;
     
     function addStoreOwner(address addr) public payable onlyAdmin {
         if(storeOwners[addr].active) {
-            revert("This address is store owner already!");
+        revert("This address is store owner already!");
         }
         
+        allStoreOwners.push(addr);
+    
         storeOwners[addr].active = true;
     }
-
+    
     modifier onlyStoreOwner() {
-        require(isStoreOwner());
+        require(isStoreOwner(), "You are not store owner.");
         _;
     }
-
+     
+    function isStoreFrontActive(bytes32 storeKey) private view {
+        require(storeFronts[storeKey].active == true, "Store front doesn't exist.");
+    }
+     
+    function isProductActive(bytes32 storeKey, bytes32 productKey) private view {
+        require(storeFronts[storeKey].active == true, "Store front doesn't exist.");
+        require(storeFronts[storeKey].products[productKey].active == true, "Product doesn't exist.");
+    }
+    
     function isStoreOwner() public view returns(bool) {
         return storeOwners[msg.sender].active == true;
     }
     
-    function addStoreFront(string memory name) public payable onlyStoreOwner {
-        uint256 index = storeOwners[msg.sender].count++;
-
-        StoreFront addr = new StoreFront();
-
+    function addStoreFront(string memory name) public payable onlyStoreOwner returns(address) {
+        require(bytes(name).length != 0, "Store name is required.");
+         
+        StoreFront addr = new StoreFront(msg.sender);
+        
         Store memory storeFront;
         storeFront.active = true;
         storeFront.name = name;
         storeFront.addr = addr;
-
-        storeOwners[msg.sender].storeFronts[index] = storeFront;
+        
+        bytes32 key = keccak256(abi.encodePacked(name, now));
+        
+        storeOwners[msg.sender].keys.push(key);
+        storeFrontsKeys.push(key);
+        storeFronts[key] = storeFront;
+        
+        return address(addr);
     }
-
-    modifier storeFrontActive(uint256 key) {
-        require(storeOwners[msg.sender].storeFronts[key].active == true);
-        _;
-    }
-
-    function getStoreFrontsCount() public view onlyStoreOwner returns (uint256) {
-        return storeOwners[msg.sender].count;
-    }
-
-    function getStoreFront(uint256 key) public view onlyStoreOwner storeFrontActive(key) returns (string memory) {
-        return storeOwners[msg.sender].storeFronts[key].name;
+     
+    function getStoreFrontsList() public view onlyStoreOwner returns (bytes32[] memory) {
+        return storeOwners[msg.sender].keys;
     }
     
-    function addProduct(uint256 key, uint256 price) public payable onlyStoreOwner storeFrontActive(key) {
+    function getStoreFront(bytes32 storeKey) public view onlyStoreOwner returns (StoreFront, string memory) {
+        isStoreFrontActive(storeKey);
+         
+        return (storeFronts[storeKey].addr, storeFronts[storeKey].name);
+    }
+     
+    function validatePrice(uint256 price) private pure {
         require(price > 0, "Price is required!");
-
-        uint256 index = storeOwners[msg.sender].storeFronts[key].count++;
-
-        storeOwners[msg.sender].storeFronts[key].products[index] = Product(true, price);
     }
-
+    
+    function addProduct(bytes32 storeKey, uint256 price) public payable onlyStoreOwner {
+        isStoreFrontActive(storeKey);
+        validatePrice(price);
+    
+        bytes32 key = keccak256(abi.encodePacked(price, now));
+        
+        storeFronts[storeKey].keys.push(key);
+    
+        storeFronts[storeKey].products[key] = Product(true, price);
+    }
+    
     function editProduct(
-        uint256 storeKey, 
-        uint256 productKey, 
-        uint price) public payable 
-        onlyStoreOwner 
-        storeFrontActive(storeKey) {
-        storeOwners[msg.sender].storeFronts[storeKey].products[productKey].price = price;
+        bytes32 storeKey, 
+        bytes32 productKey, 
+        uint256 price
+        ) public payable 
+        onlyStoreOwner  {
+        isProductActive(storeKey, productKey);
+        validatePrice(price);
+            
+        storeFronts[storeKey].products[productKey].price = price;
     }
-
-    function getProduct(
-        uint256 storeKey, 
-        uint256 productKey) public view 
-        onlyStoreOwner 
-        storeFrontActive(storeKey) returns(uint256) {
-        return storeOwners[msg.sender].storeFronts[storeKey].products[productKey].price;
+    
+    function getProduct(bytes32 storeKey, bytes32 productKey) public view returns(uint256) {
+        isProductActive(storeKey, productKey);
+        
+        return storeFronts[storeKey].products[productKey].price;
     }
-
-    function getProductsCount(uint256 storeKey) public view onlyStoreOwner storeFrontActive(storeKey) returns(uint256) {
-        return storeOwners[msg.sender].storeFronts[storeKey].count;
+    
+    function getProductsList(bytes32 storeKey) public view onlyStoreOwner returns(bytes32[] memory) {
+        isStoreFrontActive(storeKey);
+        
+        return storeFronts[storeKey].keys;
     }
-
-    function removeProduct(
-        uint256 storeKey, 
-        uint256 productKey) public payable 
-        onlyStoreOwner 
-        storeFrontActive(storeKey) {
-        delete(storeOwners[msg.sender].storeFronts[storeKey].products[productKey]);
-        storeOwners[msg.sender].storeFronts[storeKey].count--;
+    
+    function removeProduct(bytes32 storeKey, bytes32 productKey) public payable 
+        onlyStoreOwner returns(bytes32[] memory)  {
+        isProductActive(storeKey, productKey);
+            
+        delete(storeFronts[storeKey].products[productKey]);
+        
+        for(uint i = 0; i < storeFronts[storeKey].keys.length; i++) {
+            if(productKey == storeFronts[storeKey].keys[i]) {
+                bytes32 key = storeFronts[storeKey].keys[storeFronts[storeKey].keys.length - 1];
+                storeFronts[storeKey].keys[i] = key;
+                delete key;
+                storeFronts[storeKey].keys.length--;
+                return storeFronts[storeKey].keys;
+            }
+        }
     }
 }
