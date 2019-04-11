@@ -5,6 +5,7 @@ import './StoreFront.sol';
 
 contract Marketplace is Ownable {
     mapping (address => bool) private admins;
+    address[] private allAdmins;
     
     modifier onlyAdmin() {
         require(isAdmin(), "You are not admin.");
@@ -19,8 +20,13 @@ contract Marketplace is Ownable {
         if(admins[adminAddr] == true) {
             revert("This address is admin already!");
         }
-    
+
+        allAdmins.push(adminAddr);
         admins[adminAddr] = true;
+    }
+
+    function getAdmins() public view onlyOwner returns(address[] memory) {
+        return allAdmins;
     }
     
     struct Store {
@@ -56,8 +62,11 @@ contract Marketplace is Ownable {
         }
         
         allStoreOwners.push(addr);
-    
         storeOwners[addr].active = true;
+    }
+
+    function getStoreOwners() public view onlyAdmin returns(address[] memory) {
+        return allStoreOwners;
     }
     
     modifier onlyStoreOwner() {

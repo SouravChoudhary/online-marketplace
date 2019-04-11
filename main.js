@@ -4,17 +4,6 @@ ethers.onready = function() {
     initContract();
 }
 
-// window.onload = function() {
-//     if(typeof web3 === 'undefined') {
-//         console.log('Error! Web3 object not found!');
-//     } else {
-//         $(document).ready(function(){
-//             console.log('Web3 dapp initialized.');
-//             initContract();
-//         }); 
-//     }
-// }
-
 let marketplaceInstance;
 let contractABI;
 let contract;
@@ -58,7 +47,7 @@ function onlyOwner() {
         if(!err && res === true){
             setWelcomeTitle('owner');
             $('#accountRole').load( "./pages/owner.html", function() {
-                // getAdmins();
+                getAdmins();
                 addAdmin();
             });
         }
@@ -72,21 +61,21 @@ function addAdmin() {
         'addItemInput': '#addAdminInput',
         'listOfItems': '#listOfAdmins',
         'itemAddedMsg': 'Admin added successfully!',
-        'itemDublicateMsg': 'This address is admin already!',
+        'itemDublicateMsg': 'Invalid address or this address is admin already!',
         'itemRequiredMsg': 'Please enter admin address.'
     };
 
     addItem(admin);
 }
 
-// function getAdmins() {
-//     const admins = {
-//         'getItemsList': '#listOfAdmins',
-//         'getMethod': 'getAdmins'
-//     };
+function getAdmins() {
+    const admins = {
+        'getItemsList': '#listOfAdmins',
+        'getMethod': 'getAdmins'
+    };
 
-//     getItems(admins);
-// }
+    getItems(admins);
+}
 
 //#endregion
 
@@ -98,7 +87,7 @@ function onlyAdmin() {
             setWelcomeTitle('admin');
             $('#accountRole').load( "./pages/admin.html", function(){
                 addStoreOwner();
-                // getStoreOwners();
+                getStoreOwners();
             });
         }
     });
@@ -111,21 +100,21 @@ function addStoreOwner() {
         'addItemInput': '#addStoreOwnerInput',
         'listOfItems': '#listOfStoreOwners',
         'itemAddedMsg': 'Store owner added successfully!',
-        'itemDublicateMsg': 'This address is store owner already!',
+        'itemDublicateMsg': 'Invalid address or this address is store owner already!',
         'itemRequiredMsg': 'Please enter store owner address.'
     }
 
     addItem(storeOwner);
 }
 
-// function getStoreOwners() {
-//     const storeOwners = {
-//         'getItemsList': '#listOfStoreOwners',
-//         'getMethod': 'getStoreOwners'
-//     };
+function getStoreOwners() {
+    const storeOwners = {
+        'getItemsList': '#listOfStoreOwners',
+        'getMethod': 'getStoreOwners'
+    };
 
-//     getItems(storeOwners);
-// }
+    getItems(storeOwners);
+}
 
 //#endregion
 
@@ -421,8 +410,13 @@ function backBtnStoreOwner() {
 function getStoreFrontProps(index, name, address, balance) {
     let wei = ethers.formatEther(balance.toString());
     let eth = wei.toString();
+    let disabled = '';
+    
+    if(eth < 0.001) {
+        disabled = 'disabled';
+    }
 
-    $('#listOfStoreFronts').append('<div class="col-2 ml-3 mr-3 card"><div class="card-body"><h5 class="card-title text-center mb-3 mt-3">'+name+'</h5><p class="card-text"></p><div class="text-center"><div>Address:</div><div>'+address+'</div><div>Balance:</div><div>'+eth+' ETH</div><button type="button" class="btn btn-secondary mb-3 mt-3 float-left" data-address="'+address+'" data-index="'+index+'" data-name="'+name+'" onclick="manageStoreFront(this)">Manage</button><button type="button" class="btn btn-warning mb-3 mt-3 float-right" data-index="'+index+'" onclick="withdrawStoreFrontBalance(this)">Withdraw</button></div></div></div>');
+    $('#listOfStoreFronts').append('<div class="col-2 ml-3 mr-3 card"><div class="card-body"><h5 class="card-title text-center mb-3 mt-3">'+name+'</h5><p class="card-text"></p><div class="text-center"><div>Address:</div><div>'+address+'</div><div>Balance:</div><div>'+eth+' ETH</div><button type="button" class="btn btn-secondary mb-3 mt-3 float-left" data-address="'+address+'" data-index="'+index+'" data-name="'+name+'" onclick="manageStoreFront(this)">Manage</button><button type="button" class="btn btn-warning mb-3 mt-3 float-right" data-index="'+index+'" onclick="withdrawStoreFrontBalance(this)" '+disabled+'>Withdraw</button></div></div></div>');
 }
 
 function withdrawStoreFrontBalance(el) {
@@ -485,6 +479,19 @@ function setWelcomeTitle(role) {
 
 function clearAlerts() {
     $('[role="alert"]').remove();
+}
+
+function getItems(item) {
+    marketplaceInstance[item.getMethod]({'from': account()}, function(err, res){
+        if(!err && res.length > 0){
+            $(item.getItemsList).empty();
+            for(let i = 0; i < res.length; i++) {
+                $(item.getItemsList).append('<li><div class="float-left">'+res[i]+'</div></li>');
+            }
+        } else {
+            alertMessage('The list is empty.', 'primary');
+        }
+    });
 }
 
 //#endregion
