@@ -1,15 +1,19 @@
 //#region Initiate contract
 
-window.onload = function() {
-    if(typeof web3 === 'undefined') {
-        console.log('Error! Web3 object not found!');
-    } else {
-        $(document).ready(function(){
-            console.log('Web3 dapp initialized.');
-            initContract();
-        }); 
-    }
+ethers.onready = function() {
+    initContract();
 }
+
+// window.onload = function() {
+//     if(typeof web3 === 'undefined') {
+//         console.log('Error! Web3 object not found!');
+//     } else {
+//         $(document).ready(function(){
+//             console.log('Web3 dapp initialized.');
+//             initContract();
+//         }); 
+//     }
+// }
 
 let marketplaceInstance;
 let contractABI;
@@ -28,9 +32,10 @@ function initContract() {
         marketplaceInstance = contract.at(contractAddress);
     }).then(function(){
         getCurrentAddress();
-
+        
         marketplace();
     })
+
 }
 
 //#endregion
@@ -38,14 +43,10 @@ function initContract() {
 //#region Makretplace
 
 function marketplace() {
-    //only owner
-    onlyOwner();
-
-    //only admin
-    onlyAdmin();
-
-    //onlt store owner
-    onlyStoreOwner();
+    $.when(onlyOwner())
+    .then(onlyAdmin())
+    .then(onlyStoreOwner())
+    .then(shopper());
 }
 
 //#endregion
@@ -147,7 +148,7 @@ function addStoreFront() {
             marketplaceInstance.addStoreFront(storeName, {'from': account()}, function(err, res){
                 if(!err) {
                     clearAlerts();
-                    getStoreFront(storeName);
+                    getStoreFront('', storeName);
                     alertMessage('Store front added successfully!', 'success');
                     window.location.reload();
                 } else {
@@ -177,33 +178,36 @@ function getStoreFronts() {
 function addProduct(index) {
     $('#addProduct').on('click', function(){
         let productPrice = $('#productPrice').val();
+        let productQuantity = $('#productQuantity').val();
 
-        if(productPrice !== '') {
-            marketplaceInstance.addProduct(index, productPrice, {'from': account()}, function(err, res){
+        if(productPrice !== '' && productQuantity != '' && Number(productQuantity) >= 1) {
+            
+            let priceInWei = ethers.parseEther(productPrice.toString());
+            priceInWei = priceInWei.toString();
+
+            marketplaceInstance.addProduct(index, priceInWei, productQuantity, {'from': account()}, function(err, res){
                 if(!err) {
                     clearAlerts();
                     alertMessage('Product added successfully!', 'success');
                     window.location.reload();
-                } else {
-                    alertMessage(err.message, 'danger');        
                 }
-                //window.location.reload();
             });
         } else {
-            alertMessage('Name and price fields are required!', 'danger');
+            alertMessage('Price and quantity fields are required and must be positive numbers!', 'danger');
         }
     });
 }
 
-function getProducts(storeIndex) {
+function getProducts(storeIndex, role) {
     marketplaceInstance.getProductsList(storeIndex, {'from': account()}, function(err, res){
         if(!err && res.length !== 0) {
             for(let i = 0; i < res.length; i++) {
                 marketplaceInstance.getProduct(storeIndex, res[i], {'from': account()}, function(error, result){
                     if(result !== null) {
-                        let price = Number(result.toString());
-                        if(price !== 0) {
-                            showProductsList(storeIndex, res[i], price);
+                        let price = Number(result[0].toString());
+                        let quantity = Number(result[1].toString());
+                        if(price !== 0 && quantity !== 0 && quantity >= 1) {
+                            showProductsList(storeIndex, res[i], price, quantity, role);
                         }
                     }
                 });
@@ -215,14 +219,17 @@ function getProducts(storeIndex) {
 function editProduct(el) {
     let storeIndex = $(el).attr('data-store-front-index');
     let productIndex = $(el).attr('data-product-index');
-    let itemId = '[data-id="updatePrice'+storeIndex+''+productIndex+'"]';
-    
-    $(itemId).removeAttr('disabled');
+    let itemPriceId = '[data-id="updatePrice'+storeIndex+''+productIndex+'"]';
+    let itemQuantityId = '[data-id="updateQuantity'+storeIndex+''+productIndex+'"]';
+
+    $(itemPriceId).removeAttr('disabled');
+    $(itemQuantityId).removeAttr('disabled');
 
     $(el).text('Close').removeAttr('onclick');
 
     $(el).one('click', function(){
-        $(itemId).attr('disabled', 'disabled');
+        $(itemPriceId).attr('disabled', 'disabled');
+        $(itemQuantityId).attr('disabled', 'disabled');
         $(el).attr('onclick', 'editProduct(this)').text('Edit');
         $(el).siblings('[data-update="true"]').attr('hidden', 'hidden');
     });
@@ -232,7 +239,12 @@ function editProduct(el) {
     $(el).siblings('[data-update="true"]').on('click', function(){
         let price = Number($(el).parents(0).siblings('[data-product="price"]').children().first().val());
 
-        marketplaceInstance.editProduct(storeIndex, productIndex, price, {'from': account()}, function(err, res){
+        let priceInWei = ethers.parseEther(price.toString());
+        priceInWei = priceInWei.toString();
+
+        let quantity = Number($(el).parents(0).siblings('[data-product="quantity"]').children().first().val());
+        
+        marketplaceInstance.editProduct(storeIndex, productIndex, priceInWei, quantity, {'from': account()}, function(err, res){
             if(!err ) {
                 alertMessage('Product edited successfully!','success');
                 window.location.reload();
@@ -243,13 +255,121 @@ function editProduct(el) {
     });
 }
 
-function showProductsList(storeIndex, productIndex, price) {
-    $('#productsList').append('<div class="row mt-4 mb-4 border border-secondary"><div class="col-2 my-auto">Price:</div><div class="col-10" data-product="price"><input class="form-control mb-3 mt-3" data-id="updatePrice'+storeIndex+''+productIndex+'" type="text" placeholder="Enter product price" name="updatePrice" disabled></div><div class="col-12"><button type="button" class="btn btn-secondary mb-3 mt-3 float-left" data-edit="true" data-store-front-index="'+storeIndex+'" data-product-index="'+productIndex+'" onclick="editProduct(this)">Edit</button><button data-update="true" type="button" class="btn btn-primary ml-3 mb-3 mt-3 float-left" hidden>Update</button><button type="button" class="btn btn-danger mb-3 mt-3 float-right" data-store-front-index="'+storeIndex+'" data-product-index="'+productIndex+'" onclick="removeProduct(this)">Delete</button></div></div>');
+function showProductsList(storeIndex, productIndex, price, quantity, role) {
+    let storeOwnerFunc = '<button type="button" class="btn btn-secondary mb-3 mt-3 float-left" data-edit="true" data-store-front-index="'+storeIndex+'" data-product-index="'+productIndex+'" onclick="editProduct(this)">Edit</button><button data-update="true" type="button" class="btn btn-primary ml-3 mb-3 mt-3 float-left" hidden>Update</button><button type="button" class="btn btn-danger mb-3 mt-3 float-right" data-store-front-index="'+storeIndex+'" data-product-index="'+productIndex+'" onclick="removeProduct(this)">Delete</button>';
 
-    $('[data-id="updatePrice'+storeIndex+''+productIndex+'"]').text(price).val(price);
+    let shopperFunc = '<div class="row"><div class="col-2 offset-10"><input class="form-control mb-3 mt-3 float-left" data-id="buyQuantity'+storeIndex+''+productIndex+'" type="text" placeholder="Enter quantity to buy" name="buyQuantity"><button type="button" class="btn btn-success mb-3 mt-3 float-right" data-store-front-index="'+storeIndex+'" data-product-index="'+productIndex+'" onclick="buyProduct(this)">Buy</button></div>';
+
+    let btn = '';
+
+    if(role === 'store owner') {
+        btn = storeOwnerFunc;
+    }
+
+    if(role === 'shopper') {
+        btn = shopperFunc;
+    }
+
+    $('#productsList').append('<div class="row mt-4 mb-4 border border-secondary"><div class="col-2 my-auto">Price: (ETH)</div><div class="col-10" data-product="price"><input class="form-control mb-3 mt-3" data-id="updatePrice'+storeIndex+''+productIndex+'" type="text" placeholder="Enter product price" name="updatePrice" disabled></div><div class="col-2 my-auto">Quantity:</div><div class="col-10" data-product="quantity"><input class="form-control mb-3 mt-3" data-id="updateQuantity'+storeIndex+''+productIndex+'" type="text" placeholder="Enter product quantity" name="updateQuantity" disabled></div><div class="col-12">'+btn+'</div></div>');
+
+    let priceInEther = ethers.formatEther(price.toString());
+    priceInEther = priceInEther.toString();
+
+    $('[name="buyQuantity"]').on('change keydown keyup', function() {
+        let total = (Number($(this).val())*Number(priceInEther)).toFixed(6);
+
+        let final = ethers.parseEther(total.toString());
+        final = final.toString();
+
+        $('[onclick="buyProduct(this)"]').text('Total: '+total+' ETH Buy Now').attr('data-product-price', final);
+    })
+
+    $('[data-id="updatePrice'+storeIndex+''+productIndex+'"]').text(priceInEther).val(priceInEther);
+    $('[data-id="updateQuantity'+storeIndex+''+productIndex+'"]').text(quantity).val(quantity);
 }
 
-//#region
+//#endregion
+
+//#region Shopper
+
+function shopper() {
+    $('#accountRole').load( "./pages/shoppers.html", function(){
+        getShopperStoreFronts();
+    });
+}
+
+function getShopperStoreFronts() {
+    marketplaceInstance.shopperStoreFronts({'from': account()}, function(err, res){
+        if(!err){
+            setWelcomeTitle('shopper');
+            displayStoreFronts(res);
+        }
+    });
+}
+
+function displayStoreFronts(res) {
+    for(let i = 0; i < res.length; i++) {
+        marketplaceInstance.getStoreFront(res[i], {'from': account()}, function(error, result){
+            getShopperStoreFront(res[i], result);
+        });
+    }
+}
+
+function getShopperStoreFront(index, data) {
+    let address = 0;
+    let name = '';
+    if(typeof data === 'string') {
+        name = data;
+    } else {
+        address = data[0];
+        name = data[1];
+    }
+
+    $('#listOfStoreFronts').append('<div class="col-2 ml-3 mr-3 card"><div class="card-body"><h5 class="card-title text-center mb-3 mt-3">'+name+'</h5><p class="card-text"></p><div class="text-center"><button type="button" class="btn btn-secondary mb-3 mt-3" data-address="'+address+'" data-index="'+index+'" data-name="'+name+'" onclick="checkProducts(this)">Check Products</button></div></div></div>');
+}
+
+function checkProducts(el) {
+    let index = $(el).attr('data-index');
+    let name = $(el).attr('data-name');
+
+    clearAlerts();
+    $('#accountRole').load( "./pages/products-shoppers.html", function() {
+        getProducts(index, 'shopper');
+        setStoreFrontName(name);
+        backBtnShopper();
+    });
+}
+
+function backBtnShopper() {
+    $('#backBtn').on('click', function(){
+        shopper();
+    });
+}
+
+function buyProduct(el){
+    let storeFrontIndex = $(el).attr('data-store-front-index');
+    let productIndex = $(el).attr('data-product-index');
+    let price = $(el).attr('data-product-price');
+    let quantity = $(el).siblings('input[name="buyQuantity"]').val();
+
+    if(Number(quantity) >= 1 && Number(quantity) % 1 === 0) {
+        marketplaceInstance.buyProduct(storeFrontIndex, productIndex, quantity.toString(), {'from': account(), 'value': price }, function(err, res){
+            console.log(res);
+            if(!err) {
+                clearAlerts();
+                alertMessage('Product bought successfully', 'success');
+                window.location.reload();
+            } else {
+                alertMessage(err.message, 'danger');
+                alertMessage('Error! Product was not bought!', 'danger');
+            }
+        });
+    } else {
+        alertMessage('Quantity must be a positive number!', 'danger');
+    }
+}
+
+//#endregion
 
 //#region Helpers
 
@@ -289,12 +409,17 @@ function addItem(item) {
     });
 }
 
-function productsHelpers(name) {
+function newProductsToggle() {
     $('#showProductForm').on('click', function(){
         $('#productForm').toggle(0);
     });
+}
 
+function setStoreFrontName(name) {
     $('#storeFrontName').text(name);
+}
+
+function backBtnStoreOwner() {
     $('#backBtn').on('click', function(){
         clearAlerts();
         loadStoreFronts();
@@ -319,10 +444,12 @@ function manageStoreFront(el) {
     let name = $(el).attr('data-name');
 
     clearAlerts();
-    $('#accountRole').load( "./pages/products.html", function() {
+    $('#accountRole').load( "./pages/products-store-owners.html", function() {
         addProduct(index);
-        getProducts(index);
-        productsHelpers(name)
+        getProducts(index, 'store owner');
+        newProductsToggle();
+        setStoreFrontName(name);
+        backBtnStoreOwner();
     });
 }
 
@@ -348,7 +475,7 @@ function removeProduct(el){
 }
 
 function setWelcomeTitle(role) {
-    $('#welcomeTitle').append('<h2>Welcome, '+role+'!</h2>');
+    $('#welcomeTitle').html('<h2>Welcome, '+role+'!</h2>');
 }
 
 function clearAlerts() {
