@@ -15,7 +15,7 @@ contract Marketplace is Ownable {
         return admins[msg.sender] == true;
     }
     
-    function addAdmin(address adminAddr) public payable onlyOwner {
+    function addAdmin(address adminAddr) public onlyOwner {
         if(admins[adminAddr] == true) {
             revert("This address is admin already!");
         }
@@ -25,7 +25,7 @@ contract Marketplace is Ownable {
     
     struct Store {
         bool active;
-        StoreFront addr;
+        StoreFront store;
         string name;
         bytes32[] keys;
         mapping (bytes32 => Product) products;
@@ -45,13 +45,14 @@ contract Marketplace is Ownable {
      
     bytes32[] private storeFrontsKeys;
     mapping (bytes32 => Store) private storeFronts;
+    mapping (address => bool) private storeFrontsAddr;
      
     address[] private allStoreOwners;
     mapping (address => StoreOwner) private storeOwners;
     
-    function addStoreOwner(address addr) public payable onlyAdmin {
+    function addStoreOwner(address addr) public onlyAdmin {
         if(storeOwners[addr].active) {
-        revert("This address is store owner already!");
+            revert("This address is store owner already!");
         }
         
         allStoreOwners.push(addr);
@@ -76,41 +77,57 @@ contract Marketplace is Ownable {
     function isStoreOwner() public view returns(bool) {
         return storeOwners[msg.sender].active == true;
     }
-    
-    function addStoreFront(string memory name) public payable onlyStoreOwner returns(address) {
+
+    function addStoreFront(string memory name) public onlyStoreOwner returns(address) {
         require(bytes(name).length != 0, "Store name is required.");
          
-        StoreFront addr = new StoreFront(msg.sender);
-        
-        Store memory storeFront;
-        storeFront.active = true;
-        storeFront.name = name;
-        storeFront.addr = addr;
-        
         bytes32 key = keccak256(abi.encodePacked(name, now));
         
         storeOwners[msg.sender].keys.push(key);
         storeFrontsKeys.push(key);
+
+        StoreFront store = new StoreFront(key);
+        
+        Store memory storeFront;
+        storeFront.active = true;
+        storeFront.name = name;
+        storeFront.store = store;
+        storeFrontsAddr[address(store)] = true;
+
         storeFronts[key] = storeFront;
         
-        return address(addr);
+        return address(store);
     }
      
     function getStoreFrontsList() public view onlyStoreOwner returns (bytes32[] memory) {
         return storeOwners[msg.sender].keys;
     }
     
-    function getStoreFront(bytes32 storeKey) public view returns (address, string memory) {
+    function getStoreFrontName(bytes32 storeKey) public view returns (string memory) {
         isStoreFrontActive(storeKey);
         
-        return (storeFronts[storeKey].addr.getAddress(), storeFronts[storeKey].name);
+        return storeFronts[storeKey].name;
+    }
+
+    function getStoreFrontProps(bytes32 key) public view onlyStoreOwner returns(string memory, address, uint256) {
+        isStoreFrontActive(key);
+
+        return (storeFronts[key].name,
+                storeFronts[key].store.getAddress(key),
+                storeFronts[key].store.getBalance(key));
+    }
+    
+    function withdrawStoreFrontBalance(bytes32 key) public onlyStoreOwner {
+        uint256 balance = storeFronts[key].store.withdraw(key);
+        
+        msg.sender.transfer(balance);
     }
      
     function validatePriceAndQuantity(uint256 price,uint256 quantity) private pure {
         require(price > 0 && quantity >= 1, "Price is required!");
     }
     
-    function addProduct(bytes32 storeKey, uint256 price, uint256 quantity) public payable onlyStoreOwner {
+    function addProduct(bytes32 storeKey, uint256 price, uint256 quantity) public onlyStoreOwner {
         isStoreFrontActive(storeKey);
         validatePriceAndQuantity(price, quantity);
     
@@ -121,7 +138,7 @@ contract Marketplace is Ownable {
         storeFronts[storeKey].products[key] = Product(true, price, quantity);
     }
     
-    function editProduct(bytes32 storeKey, bytes32 productKey, uint256 price, uint256 quantity) public payable onlyStoreOwner  {
+    function editProduct(bytes32 storeKey, bytes32 productKey, uint256 price, uint256 quantity) public onlyStoreOwner  {
         isProductActive(storeKey, productKey);
         validatePriceAndQuantity(price, quantity);
 
@@ -148,8 +165,7 @@ contract Marketplace is Ownable {
         return storeFronts[storeKey].keys;
     }
     
-    function removeProduct(bytes32 storeKey, bytes32 productKey) public payable 
-        onlyStoreOwner returns(bytes32[] memory)  {
+    function removeProduct(bytes32 storeKey, bytes32 productKey) public onlyStoreOwner returns(bytes32[] memory)  {
         isProductActive(storeKey, productKey);
             
         delete(storeFronts[storeKey].products[productKey]);
@@ -164,26 +180,31 @@ contract Marketplace is Ownable {
             }
         }
     }
-     
-    modifier onlyShopper() {
+
+    function isShopper() public view returns(bool) {
         require(msg.sender != owner(), "You are not shopper.");
         require(!isAdmin(), "You are not shopper.");
         require(!isStoreOwner(), "You are not shopper.");
-        _;
+        
+        return true;
     }
-
-    function shopperStoreFronts() public view onlyShopper returns (bytes32[] memory) {
+     
+    function shopperStoreFronts() public view returns (bytes32[] memory) {
         return storeFrontsKeys;
     }
     
-    function buyProduct(bytes32 storeKey, bytes32 productKey, uint256 quantity) public payable {
+    function buyProduct(bytes32 storeKey, bytes32 productKey, uint256 requestedQtity) public payable {
         (uint256 price, uint256 qtity) = getProduct(storeKey, productKey);
-        require(msg.value >= price);
-        require(qtity >= quantity);
-        address storeAddress = address(storeFronts[storeKey].addr.getAddress());
-
-        storeAddress.call.value(msg.value).gas(50000);
         
-        storeFronts[storeKey].products[productKey].quantity -= qtity;
+        require(msg.value >= price * requestedQtity);
+        require(qtity >= requestedQtity);
+        
+        uint256 totalPrice = price * requestedQtity;
+        
+        storeFronts[storeKey].store.deposit(storeKey, totalPrice);
+        
+        storeFronts[storeKey].products[productKey].quantity -= requestedQtity;
+        
+        assert(storeFronts[storeKey].products[productKey].quantity + requestedQtity == qtity);
      }
 }

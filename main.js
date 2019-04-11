@@ -148,7 +148,6 @@ function addStoreFront() {
             marketplaceInstance.addStoreFront(storeName, {'from': account()}, function(err, res){
                 if(!err) {
                     clearAlerts();
-                    getStoreFront('', storeName);
                     alertMessage('Store front added successfully!', 'success');
                     window.location.reload();
                 } else {
@@ -165,8 +164,8 @@ function getStoreFronts() {
     marketplaceInstance.getStoreFrontsList({'from': account()}, function(err, res){
         if(!err && res.length !== 0) {
             for(let i = 0; i < res.length; i++) {
-                marketplaceInstance.getStoreFront(res[i], {'from': account()}, function(error, result){
-                    getStoreFront(res[i], result);
+                marketplaceInstance.getStoreFrontProps(res[i], {'from': account()}, function(error, props){
+                    getStoreFrontProps(res[i], props[0], props[1], props[2]);
                 });
             }
         } else {
@@ -258,7 +257,7 @@ function editProduct(el) {
 function showProductsList(storeIndex, productIndex, price, quantity, role) {
     let storeOwnerFunc = '<button type="button" class="btn btn-secondary mb-3 mt-3 float-left" data-edit="true" data-store-front-index="'+storeIndex+'" data-product-index="'+productIndex+'" onclick="editProduct(this)">Edit</button><button data-update="true" type="button" class="btn btn-primary ml-3 mb-3 mt-3 float-left" hidden>Update</button><button type="button" class="btn btn-danger mb-3 mt-3 float-right" data-store-front-index="'+storeIndex+'" data-product-index="'+productIndex+'" onclick="removeProduct(this)">Delete</button>';
 
-    let shopperFunc = '<div class="row"><div class="col-2 offset-10"><input class="form-control mb-3 mt-3 float-left" data-id="buyQuantity'+storeIndex+''+productIndex+'" type="text" placeholder="Enter quantity to buy" name="buyQuantity"><button type="button" class="btn btn-success mb-3 mt-3 float-right" data-store-front-index="'+storeIndex+'" data-product-index="'+productIndex+'" onclick="buyProduct(this)">Buy</button></div>';
+    let shopperFunc = '<div class="row"><div class="col-3 offset-9"><input class="form-control mb-3 mt-3 float-left" data-id="buyQuantity'+storeIndex+''+productIndex+'" type="text" placeholder="Enter quantity to buy" name="buyQuantity"><button type="button" class="btn btn-success mb-3 mt-3 float-right" data-store-front-index="'+storeIndex+'" data-product-index="'+productIndex+'" onclick="buyProduct(this)">Buy</button></div>';
 
     let btn = '';
 
@@ -293,8 +292,12 @@ function showProductsList(storeIndex, productIndex, price, quantity, role) {
 //#region Shopper
 
 function shopper() {
-    $('#accountRole').load( "./pages/shoppers.html", function(){
-        getShopperStoreFronts();
+    marketplaceInstance.isShopper({'from': account()}, function(err, res) {
+        if(!err && res === true){
+            $('#accountRole').load( "./pages/shoppers.html", function(){
+                getShopperStoreFronts();
+            });
+        }
     });
 }
 
@@ -309,23 +312,14 @@ function getShopperStoreFronts() {
 
 function displayStoreFronts(res) {
     for(let i = 0; i < res.length; i++) {
-        marketplaceInstance.getStoreFront(res[i], {'from': account()}, function(error, result){
+        marketplaceInstance.getStoreFrontName(res[i], {'from': account()}, function(error, result){
             getShopperStoreFront(res[i], result);
         });
     }
 }
 
-function getShopperStoreFront(index, data) {
-    let address = 0;
-    let name = '';
-    if(typeof data === 'string') {
-        name = data;
-    } else {
-        address = data[0];
-        name = data[1];
-    }
-
-    $('#listOfStoreFronts').append('<div class="col-2 ml-3 mr-3 card"><div class="card-body"><h5 class="card-title text-center mb-3 mt-3">'+name+'</h5><p class="card-text"></p><div class="text-center"><button type="button" class="btn btn-secondary mb-3 mt-3" data-address="'+address+'" data-index="'+index+'" data-name="'+name+'" onclick="checkProducts(this)">Check Products</button></div></div></div>');
+function getShopperStoreFront(index, name) {
+    $('#listOfStoreFronts').append('<div class="col-2 ml-3 mr-3 card"><div class="card-body"><h5 class="card-title text-center mb-3 mt-3">'+name+'</h5><p class="card-text"></p><div class="text-center"><button type="button" class="btn btn-secondary mb-3 mt-3" data-index="'+index+'" data-name="'+name+'" onclick="checkProducts(this)">Check Products</button></div></div></div>');
 }
 
 function checkProducts(el) {
@@ -354,13 +348,11 @@ function buyProduct(el){
 
     if(Number(quantity) >= 1 && Number(quantity) % 1 === 0) {
         marketplaceInstance.buyProduct(storeFrontIndex, productIndex, quantity.toString(), {'from': account(), 'value': price }, function(err, res){
-            console.log(res);
             if(!err) {
                 clearAlerts();
                 alertMessage('Product bought successfully', 'success');
                 window.location.reload();
             } else {
-                alertMessage(err.message, 'danger');
                 alertMessage('Error! Product was not bought!', 'danger');
             }
         });
@@ -426,17 +418,24 @@ function backBtnStoreOwner() {
     });
 }
 
-function getStoreFront(index, data) {
-    let address = 0;
-    let name = '';
-    if(typeof data === 'string') {
-        name = data;
-    } else {
-        address = data[0];
-        name = data[1];
-    }
+function getStoreFrontProps(index, name, address, balance) {
+    let wei = ethers.formatEther(balance.toString());
+    let eth = wei.toString();
 
-    $('#listOfStoreFronts').append('<div class="col-2 ml-3 mr-3 card"><div class="card-body"><h5 class="card-title text-center mb-3 mt-3">'+name+'</h5><p class="card-text"></p><div class="text-center"><button type="button" class="btn btn-secondary mb-3 mt-3" data-address="'+address+'" data-index="'+index+'" data-name="'+name+'" onclick="manageStoreFront(this)">Manage</button></div></div></div>');
+    $('#listOfStoreFronts').append('<div class="col-2 ml-3 mr-3 card"><div class="card-body"><h5 class="card-title text-center mb-3 mt-3">'+name+'</h5><p class="card-text"></p><div class="text-center"><div>Address:</div><div>'+address+'</div><div>Balance:</div><div>'+eth+' ETH</div><button type="button" class="btn btn-secondary mb-3 mt-3 float-left" data-address="'+address+'" data-index="'+index+'" data-name="'+name+'" onclick="manageStoreFront(this)">Manage</button><button type="button" class="btn btn-warning mb-3 mt-3 float-right" data-index="'+index+'" onclick="withdrawStoreFrontBalance(this)">Withdraw</button></div></div></div>');
+}
+
+function withdrawStoreFrontBalance(el) {
+    let index = $(el).attr('data-index');
+
+    marketplaceInstance.withdrawStoreFrontBalance(index, {'from': account()}, function(err, res){
+        if(!err) {
+            alertMessage('Funds transferred successfully', 'success');
+            window.location.reload();
+        } else {
+            alertMessage('Error! Transfer failed!', 'danger');
+        }
+    });
 }
 
 function manageStoreFront(el) {
@@ -475,7 +474,13 @@ function removeProduct(el){
 }
 
 function setWelcomeTitle(role) {
-    $('#welcomeTitle').html('<h2>Welcome, '+role+'!</h2>');
+    web3.eth.getBalance(account(), function(err, data) {
+        if(!err) {
+            let wei = ethers.formatEther(data.toString());
+            let eth = wei.toString();
+            $('#welcomeTitle').html('<h2>Welcome, '+role+'!</h2><h3>Your balance is:</h3><h3>'+eth+' ETH</h3>');
+        }
+    });
 }
 
 function clearAlerts() {
