@@ -12,5 +12,5 @@ This is a sample project written in Solidity programming language. The project i
   <br>
   <li>Clone this repository locally</li>
   <br>
-  <li>Run in the project folder to install all dependencies.<br><code>$ npm install</code></li>
+  <li>Open console in the project folder and install all dependencies.<br><code>$ npm install</code></li>
 </ol>
