@@ -4,7 +4,7 @@ This is a sample project written in Solidity programming language. The project i
 
 # Installing
 <ol>
-  <li>Install nodejs (which includes npm).<br><code>$ npm install -g truffle</code></li>
+  <li>Install nodejs (which includes npm).</li>
   <br>
   <li>Install Truffle Framework.<br><code>$ npm install -g truffle</code></li>
   <br>
