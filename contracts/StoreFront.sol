@@ -48,4 +48,8 @@ contract StoreFront {
     function deposit(bytes32 _key, uint256 amount) public payable requestKey(_key) {
         balance += amount;
     }
+
+    /** @dev fallback function
+     */
+     function() external payable { }
 }
