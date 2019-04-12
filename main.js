@@ -263,13 +263,13 @@ function showProductsList(storeIndex, productIndex, price, quantity, role) {
     let priceInEther = ethers.formatEther(price.toString());
     priceInEther = priceInEther.toString();
 
-    $('[name="buyQuantity"]').on('change keydown keyup', function() {
+    $('[name="buyQuantity"][data-id="buyQuantity'+storeIndex+''+productIndex+'"]').on('click change keydown keyup', function() {
         let total = (Number($(this).val())*Number(priceInEther)).toFixed(6);
 
         let final = ethers.parseEther(total.toString());
         final = final.toString();
 
-        $('[onclick="buyProduct(this)"]').text('Total: '+total+' ETH Buy Now').attr('data-product-price', final);
+        $(this).siblings('[onclick="buyProduct(this)"]').text('Total: '+total+' ETH Buy Now').attr('data-product-price', final);
     })
 
     $('[data-id="updatePrice'+storeIndex+''+productIndex+'"]').text(priceInEther).val(priceInEther);
