@@ -38,6 +38,26 @@ contract Marketplace is Ownable {
      
     address[] private allStoreOwners;
     mapping (address => StoreOwner) private storeOwners;
+
+    
+    bool isStopped = false;
+
+    modifier stopInEmergency {
+        require(!isStopped);
+        _;
+    }
+
+    /** @dev owner stops contract when needed
+     */
+    function stopContract() public onlyOwner {
+        isStopped = true;
+    }
+
+    /** @dev owner starts contract when needed
+     */
+    function resumeContract() public onlyOwner {
+        isStopped = false;
+    }
     
     modifier onlyAdmin() {
         require(isAdmin(), "You are not admin.");
@@ -59,7 +79,7 @@ contract Marketplace is Ownable {
     /** @dev adds address as admin
       * @param adminAddr - admin address to be set as admin
       */
-    function addAdmin(address adminAddr) public onlyOwner {
+    function addAdmin(address adminAddr) public onlyOwner stopInEmergency {
         if(admins[adminAddr] == true) {
             revert("This address is admin already!");
         }
@@ -78,7 +98,7 @@ contract Marketplace is Ownable {
     /** @dev adds address as store owner
       * @param addr - address to be set as store owner
       */
-    function addStoreOwner(address addr) public onlyAdmin {
+    function addStoreOwner(address addr) public onlyAdmin stopInEmergency {
         if(storeOwners[addr].active) {
             revert("This address is store owner already!");
         }
@@ -120,7 +140,7 @@ contract Marketplace is Ownable {
     /** @dev adds store front to store owner
       * @param name - store front name
       */
-    function addStoreFront(string memory name) public onlyStoreOwner {
+    function addStoreFront(string memory name) public onlyStoreOwner stopInEmergency {
         require(bytes(name).length != 0, "Store name is required.");
          
         bytes32 key = keccak256(abi.encodePacked(name, now));
@@ -173,7 +193,7 @@ contract Marketplace is Ownable {
     /** @dev withdraws balance from store front to the store owner only
       * @param key - store front key
       */
-    function withdrawStoreFrontBalance(bytes32 key) public onlyStoreOwner {
+    function withdrawStoreFrontBalance(bytes32 key) public onlyStoreOwner stopInEmergency {
         uint256 balance = storeFronts[key].store.withdraw(key);
         
         msg.sender.transfer(balance);
@@ -192,7 +212,7 @@ contract Marketplace is Ownable {
       * @param price - product price
       * @param quantity - product quantity
       */
-    function addProduct(bytes32 storeKey, uint256 price, uint256 quantity) public onlyStoreOwner {
+    function addProduct(bytes32 storeKey, uint256 price, uint256 quantity) public onlyStoreOwner stopInEmergency {
         isStoreFrontActive(storeKey);
         validatePriceAndQuantity(price, quantity);
     
@@ -209,7 +229,7 @@ contract Marketplace is Ownable {
       * @param price - product price
       * @param quantity - product quantity
       */
-    function editProduct(bytes32 storeKey, bytes32 productKey, uint256 price, uint256 quantity) public onlyStoreOwner  {
+    function editProduct(bytes32 storeKey, bytes32 productKey, uint256 price, uint256 quantity) public onlyStoreOwner stopInEmergency  {
         isProductActive(storeKey, productKey);
         validatePriceAndQuantity(price, quantity);
 
@@ -250,7 +270,7 @@ contract Marketplace is Ownable {
       * @param storeKey - store front key
       * @param productKey - product key
       */
-    function removeProduct(bytes32 storeKey, bytes32 productKey) public onlyStoreOwner {
+    function removeProduct(bytes32 storeKey, bytes32 productKey) public onlyStoreOwner stopInEmergency {
         isProductActive(storeKey, productKey);
             
         delete(storeFronts[storeKey].products[productKey]);
@@ -288,7 +308,7 @@ contract Marketplace is Ownable {
       * @param productKey - product key
       * @param requestedQtity - product quantity to buy
       */
-    function buyProduct(bytes32 storeKey, bytes32 productKey, uint256 requestedQtity) public payable {
+    function buyProduct(bytes32 storeKey, bytes32 productKey, uint256 requestedQtity) public payable stopInEmergency {
         (uint256 price, uint256 qtity) = getProduct(storeKey, productKey);
         
         uint256 totalPrice = price.mul(requestedQtity);
