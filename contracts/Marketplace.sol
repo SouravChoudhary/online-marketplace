@@ -270,19 +270,12 @@ contract Marketplace is Ownable {
       * @param storeKey - store front key
       * @param productKey - product key
       */
-    function removeProduct(bytes32 storeKey, bytes32 productKey) public onlyStoreOwner stopInEmergency {
+    function removeProduct(bytes32 storeKey, bytes32 productKey, uint256 index) public onlyStoreOwner stopInEmergency {
         isProductActive(storeKey, productKey);
             
         delete(storeFronts[storeKey].products[productKey]);
         
-        for(uint256 i = 0; i < storeFronts[storeKey].keys.length; i++) {
-            if(productKey == storeFronts[storeKey].keys[i]) {
-                bytes32 key = storeFronts[storeKey].keys[storeFronts[storeKey].keys.length - 1];
-                storeFronts[storeKey].keys[i] = key;
-                delete key;
-                storeFronts[storeKey].keys.length = storeFronts[storeKey].keys.length.sub(1);
-            }
-        }
+        delete storeFronts[storeKey].keys[index];
     }
 
     /** @dev checks if address user is shopper

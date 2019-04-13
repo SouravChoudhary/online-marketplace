@@ -190,15 +190,17 @@ function getProducts(storeIndex, role) {
     marketplaceInstance.getProductsList(storeIndex, {'from': account()}, function(err, res){
         if(!err && res.length !== 0) {
             for(let i = 0; i < res.length; i++) {
-                marketplaceInstance.getProduct(storeIndex, res[i], {'from': account()}, function(error, result){
-                    if(result !== null) {
-                        let price = Number(result[0].toString());
-                        let quantity = Number(result[1].toString());
-                        if(price !== 0 && quantity !== 0 && quantity >= 1) {
-                            showProductsList(storeIndex, res[i], price, quantity, role);
+                if(!res[i].match(/0x0+/)) {
+                    marketplaceInstance.getProduct(storeIndex, res[i], {'from': account()}, function(error, result){
+                        if(result !== null) {
+                            let price = Number(result[0].toString());
+                            let quantity = Number(result[1].toString());
+                            if(price !== 0 && quantity !== 0 && quantity >= 1) {
+                                showProductsList(storeIndex, res[i], i, price, quantity, role);
+                            }
                         }
-                    }
-                });
+                    });
+                }
             }
         }
     });
@@ -243,8 +245,8 @@ function editProduct(el) {
     });
 }
 
-function showProductsList(storeIndex, productIndex, price, quantity, role) {
-    let storeOwnerFunc = '<button type="button" class="btn btn-secondary mb-3 mt-3 float-left" data-edit="true" data-store-front-index="'+storeIndex+'" data-product-index="'+productIndex+'" onclick="editProduct(this)">Edit</button><button data-update="true" type="button" class="btn btn-primary ml-3 mb-3 mt-3 float-left" hidden>Update</button><button type="button" class="btn btn-danger mb-3 mt-3 float-right" data-store-front-index="'+storeIndex+'" data-product-index="'+productIndex+'" onclick="removeProduct(this)">Delete</button>';
+function showProductsList(storeIndex, productIndex, index, price, quantity, role) {
+    let storeOwnerFunc = '<button type="button" class="btn btn-secondary mb-3 mt-3 float-left" data-edit="true" data-store-front-index="'+storeIndex+'" data-product-index="'+productIndex+'" onclick="editProduct(this)">Edit</button><button data-update="true" type="button" class="btn btn-primary ml-3 mb-3 mt-3 float-left" hidden>Update</button><button type="button" class="btn btn-danger mb-3 mt-3 float-right" data-store-front-index="'+storeIndex+'" data-product-index="'+productIndex+'" onclick="removeProduct(this)" data-index="'+index+'" >Delete</button>';
 
     let shopperFunc = '<div class="row"><div class="col-3 offset-9"><input class="form-control mb-3 mt-3 float-left" data-id="buyQuantity'+storeIndex+''+productIndex+'" type="text" placeholder="Enter quantity to buy" name="buyQuantity"><button type="button" class="btn btn-success mb-3 mt-3 float-right" data-store-front-index="'+storeIndex+'" data-product-index="'+productIndex+'" onclick="buyProduct(this)">Buy</button></div>';
 
@@ -454,10 +456,11 @@ function loadStoreFronts() {
 }
 
 function removeProduct(el){
-    let storeFrontIndex = $(el).attr('data-store-front-index');
-    let productIndex = $(el).attr('data-product-index');
+    let storeFrontKey = $(el).attr('data-store-front-index');
+    let productKey = $(el).attr('data-product-index');
+    let productIndex = $(el).attr('data-index');
 
-    marketplaceInstance.removeProduct(storeFrontIndex, productIndex, {'from': account()}, function(err, res){
+    marketplaceInstance.removeProduct(storeFrontKey, productKey, productIndex, {'from': account()}, function(err, res){
         if(!err) {
             alertMessage('Product removed successfully', 'success');
             window.location.reload();
